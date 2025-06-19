@@ -1,5 +1,5 @@
 {
-  "name": "gpxtoolkit/gpxtoolkit",
+  "name": "seeba/gpxtoolkit",
   "description": "A PHP library for parsing and manipulating GPX files.",
   "minimum-stability": "dev",
   "prefer-stable": true,
@@ -7,7 +7,7 @@
   "license": "MIT",
   "authors": [
     {
-      "name": "seeba",
+      "name": "Sebastian Pluta",
       "email": "poczta@sebastianpluta.pl"
     }
   ],
