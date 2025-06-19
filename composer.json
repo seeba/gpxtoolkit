@@ -1,0 +1,24 @@
+{
+  "name": "gpxtoolkit/gpxtoolkit",
+  "description": "A PHP library for parsing and manipulating GPX files.",
+  "minimum-stability": "dev",
+  "prefer-stable": true,
+  "type": "library",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "seeba",
+      "email": "poczta@sebastianpluta.pl"
+    }
+  ],
+    "autoload": {
+        "psr-4": {
+        "GpxToolkit\\": "src/"
+        }
+    },
+  "require": {
+    "php": "^8.3",
+    "ext-simplexml": "*",
+    "ext-fileinfo": "*"
+  }
+}
