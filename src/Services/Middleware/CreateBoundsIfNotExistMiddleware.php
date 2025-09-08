@@ -15,7 +15,7 @@ class CreateBoundsIfNotExistMiddleware implements MiddlewareInterface
      */
     public function handle(mixed $data, callable $next): mixed
     {
-        if ($data->metadata->bounds === null) {
+        if ($data?->metadata?->bounds === null) {
             $minLat = INF;
             $maxLat = -INF;
             $minLon = INF;
