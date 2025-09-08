@@ -6,6 +6,7 @@ namespace GpxToolkit\Services\Middleware;
 
 use GpxToolkit\Services\Model\Gpx\Bounds;
 use GpxToolkit\Services\Model\Gpx\Gpx;
+use GpxToolkit\Services\Model\Gpx\Metadata;
 
 class CreateBoundsIfNotExistMiddleware implements MiddlewareInterface
 {
@@ -31,9 +32,15 @@ class CreateBoundsIfNotExistMiddleware implements MiddlewareInterface
                 }
             }
 
-            $data->metadata->setBounds(
-                Bounds::create($minLat, $minLon, $maxLat, $maxLon)
-            );
+            if (!isset($data->metadata)) {
+                $data->setMetadata(Metadata::create(
+                    bounds: Bounds::create($minLat, $minLon, $maxLat, $maxLon)
+                ));
+            } else {
+                $data->metadata->setBounds(
+                    Bounds::create($minLat, $minLon, $maxLat, $maxLon)
+                );
+            }
         }
 
         return $next($data);

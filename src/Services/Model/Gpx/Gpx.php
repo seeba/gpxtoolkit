@@ -14,7 +14,7 @@ class Gpx implements WorkoutDataInterface, GpxElementInterface
     private function __construct(
         public readonly string $creator,
         public readonly string $version,
-        public readonly ?Metadata $metadata,
+        public ?Metadata $metadata,
         /**
          * @var GpxElementInterface[]|null
          */
@@ -63,5 +63,10 @@ class Gpx implements WorkoutDataInterface, GpxElementInterface
             GpxParser::parseCollection($element->trk, Track::class),
             null //Extensions
         );
+    }
+
+    public function setMetadata(Metadata $metadata): void
+    {
+        $this->metadata = $metadata;
     }
 }

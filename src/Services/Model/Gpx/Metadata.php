@@ -48,4 +48,29 @@ class Metadata implements GpxElementInterface
     {
         $this->bounds = $bounds;
     }
+
+    public static function create(
+        ?string $name = null,
+        ?string $description = null,
+        ?Person $author = null,
+        ?Copyright $copyright = null,
+        /**
+         * @var GpxElementInterface[]
+         */
+        array $links = [],
+        ?DateTime $time = null,
+        ?string $keywords = null,
+        ?Bounds $bounds = null
+    )
+    {
+        return new self(
+            $name,
+            $description,
+            $author,
+            $copyright,
+            $links,
+            $time,
+            $keywords,
+            $bounds);
+    }
 }
