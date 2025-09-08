@@ -11,16 +11,11 @@ use GpxToolkit\Services\Middleware\MiddlewareInterface;
 class GPXToolkit
 {
     /**
-     * @param string $path
      * @param MiddlewareInterface[] $beforeMiddlewares
      * @param MiddlewareInterface[] $afterMiddlewares
-     * @return WorkoutDataInterface
      */
-    public static function parse(
-        string $path,
-        array $beforeMiddlewares = [],
-        array $afterMiddlewares = [],
-    ): WorkOutDataInterface {
+    public static function configure(array $beforeMiddlewares = [], array $afterMiddlewares = []): void
+    {
         GpxToolkitInitializer::initialize();
         foreach ($afterMiddlewares as $middleware) {
             GpxToolkitInitializer::registerAfterParsingMiddleware($middleware);
@@ -29,11 +24,18 @@ class GPXToolkit
         foreach ($beforeMiddlewares as $middleware) {
             GpxToolkitInitializer::registerBeforeParsingMiddleware($middleware);
         }
+    }
+    /**
+     * @param string $path
+     * @return WorkoutDataInterface
+     */
+    public static function parse(
+        string $path,
 
+    ): WorkOutDataInterface {
         $file = FileHandlerRegistry::createFileHandler($path);
         $parser = FileHandlerRegistry::getParser($file->getExtension());
-        $result = $parser->parse($file);
-        return self::executeMiddleware($result, GpxToolkitInitializer::getAfterParsingMiddleware());
+        return self::executeMiddleware($parser->parse($file), GpxToolkitInitializer::getAfterParsingMiddleware());
     }
 
     /**
