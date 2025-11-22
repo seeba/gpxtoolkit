@@ -35,9 +35,60 @@ class Point extends AbstractPoint implements GpxElementInterface
         public ?float $pdop = null,
         public ?int $ageOfGpsData = null,
         public ?int $dgsid = null,
-        public ?Extensions $extensions = null
+        public ?Extensions $extensions = null,
+        public ?string $wktPoint = null,
     ) {
         parent::__construct($latitude, $longitude, $elevation, $time);
+    }
+
+    public static function create(
+        float $latitude,
+        float $longitude,
+        ?float $elevation = null,
+        ?DateTimeImmutable $time = null,
+        ?float $magVar = null,
+        ?float $geoidHeight = null,
+        ?string $name = null,
+        ?string $comment = null,
+        ?string $description = null,
+        ?string $source = null,
+        ?array $links = [],
+        ?string $symbol = null,
+        ?string $type = null,
+        ?FixType $fix = null,
+        ?int $satelitesQuantity = null,
+        ?float $hdop = null,
+        ?float $vdop = null,
+        ?float $pdop = null,
+        ?int $ageOfGpsData = null,
+        ?int $dgsid = null,
+        ?Extensions $extensions = null,
+        ?string $wktPoint = null,
+    ): self {
+        return new self(
+            $latitude,
+            $longitude,
+            $elevation,
+            $time,
+            $magVar,
+            $geoidHeight,
+            $name,
+            $comment,
+            $description,
+            $source,
+            $links ?? [],
+            $symbol,
+            $type,
+            $fix,
+            $satelitesQuantity,
+            $hdop,
+            $vdop,
+            $pdop,
+            $ageOfGpsData,
+            $dgsid,
+            $extensions,
+            $wktPoint
+        );
     }
 
     public static function parse(SimpleXMLElement $element): self

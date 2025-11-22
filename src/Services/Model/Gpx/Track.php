@@ -27,6 +27,7 @@ readonly class Track extends PointsCollection implements GpxElementInterface
          * @var GpxElementInterface[]
          */
         public array $segments = [],
+        ?string $wktLineString = null,
     ) {
         parent::__construct(
             $name,
@@ -50,8 +51,20 @@ readonly class Track extends PointsCollection implements GpxElementInterface
         ?string $type = null,
         ?Extensions $extensions = null,
         array $segments = [],
+        ?string $wktLineString = null,
     ): self {
-        return new self($name, $comment, $description, $source, $links, $number, $type, $extensions, $segments);
+        return new self(
+            $name,
+            $comment,
+            $description,
+            $source,
+            $links,
+            $number,
+            $type,
+            $extensions,
+            $segments,
+            $wktLineString
+        );
     }
 
     public static function parse(SimpleXMLElement $element): ?self
