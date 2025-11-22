@@ -37,7 +37,8 @@ readonly class Track extends PointsCollection implements GpxElementInterface
             $links,
             $number,
             $type,
-            $extensions
+            $extensions,
+            $wktLineString
         );
     }
 

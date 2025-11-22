@@ -18,6 +18,7 @@ abstract readonly class PointsCollection
         public ?int $number = null,
         public ?string $type = null,
         public ?Extensions $extensions = null,
+        public ?string $wktLineString = null,
     ) {
     }
 }
