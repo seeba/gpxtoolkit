@@ -18,8 +18,8 @@ class ReducePointsMiddleware implements MiddlewareInterface
     {
         $updatedTracks = [];
         foreach ($data->tracks as $track) {
+            $updatedSegments = [];
             foreach ($track->segments as $segment) {
-                $updatedSegments = [];
                 $reducedPoints = ReduceGPXPoints::reducePoints($segment->points, 0.00001);
                 $updatedSegments[] = TrackSegment::create($reducedPoints, $segment->extensions);
             }
