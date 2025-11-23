@@ -29,8 +29,8 @@ class GenerateWkt
 
         foreach ($points as $point) {
             $pointsWkt[] = Point::create(
-                $point->longitude,
                 $point->latitude,
+                $point->longitude,
                 $point->elevation,
                 $point->time,
                 $point->magVar,
