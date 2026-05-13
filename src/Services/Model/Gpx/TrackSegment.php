@@ -9,6 +9,11 @@ readonly class TrackSegment extends Segment implements GpxElementInterface
 {
     private const string ELEMENT_NAME = 'trkseg';
 
+    public static function create(?array $points, ?Extensions $extensions = null): self
+    {
+        return new self($points, $extensions);
+    }
+
     public static function parse(SimpleXMLElement $element): ?self
     {
         if ($element->getName() != self::ELEMENT_NAME) {

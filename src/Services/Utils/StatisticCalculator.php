@@ -12,16 +12,9 @@ use GpxToolkit\Services\Model\Gpx\Track;
 class StatisticCalculator
 {
     private const EARTH_RADIUS = 6371000;
-    private static array $speedDistribution = [
-        '0-5' => 0,    // 0-5 km/h
-        '5-10' => 0,   // 5-10 km/h
-        '10-15' => 0,  // 10-15 km/h
-        '15-20' => 0,  // 15-20 km/h
-        '20+' => 0     // powyżej 20 km/h
-    ];
 
     /**
-     * Oblicza wszystkie statystyki dla ekspedycji
+     * Oblicza wszystkie statystyki dla ekspedycji.
      */
     public static function calculateGpxStatistics(Gpx $gpx, array $statisticsTypes = []): array
     {
@@ -37,6 +30,7 @@ class StatisticCalculator
         $allPoints = [];
         $elevationProfile = [];
         $totalPoints = 0;
+        $speedDistribution = self::emptySpeedDistribution();
 
         $firstPointTime = null;
         $lastPointTime = null;
@@ -54,16 +48,19 @@ class StatisticCalculator
 
                 // Sortowanie punktów według czasu
                 usort($points, function (Point $a, Point $b) {
-                    return $a->time <=> $b->time;
+                    return ($a->time?->getTimestamp() ?? PHP_INT_MAX)
+                        <=> ($b->time?->getTimestamp() ?? PHP_INT_MAX);
                 });
 
                 // Wyznaczenie pierwszego i ostatniego punktu całej ekspedycji
-                if ($points && (!$firstPointTime || $points[0]->time < $firstPointTime)) {
-                    $firstPointTime = $points[0]->time;
+                $timedPoints = array_values(array_filter($points, static fn (Point $point): bool => null !== $point->time));
+                if ($timedPoints && (!$firstPointTime || $timedPoints[0]->time < $firstPointTime)) {
+                    $firstPointTime = $timedPoints[0]->time;
                 }
 
-                if ($points && (!$lastPointTime || end($points)->time > $lastPointTime)) {
-                    $lastPointTime = end($points)->time;
+                $lastTimedPoint = [] !== $timedPoints ? $timedPoints[count($timedPoints) - 1] : null;
+                if (null !== $lastTimedPoint && (!$lastPointTime || $lastTimedPoint->time > $lastPointTime)) {
+                    $lastPointTime = $lastTimedPoint->time;
                 }
 
                 // Obliczanie statystyk dla segmentu
@@ -76,15 +73,15 @@ class StatisticCalculator
                 // Uzupełnianie rozkładu prędkości
                 foreach ($segmentStats['speeds'] as $speed) {
                     if ($speed < 5) {
-                        self::$speedDistribution['0-5']++;
+                        ++$speedDistribution['0-5'];
                     } elseif ($speed < 10) {
-                        self::$speedDistribution['5-10']++;
+                        ++$speedDistribution['5-10'];
                     } elseif ($speed < 15) {
-                        self::$speedDistribution['10-15']++;
+                        ++$speedDistribution['10-15'];
                     } elseif ($speed < 20) {
-                        self::$speedDistribution['15-20']++;
+                        ++$speedDistribution['15-20'];
                     } else {
-                        self::$speedDistribution['20+']++;
+                        ++$speedDistribution['20+'];
                     }
                 }
 
@@ -118,14 +115,27 @@ class StatisticCalculator
             'averageSpeed' => $averageSpeed,
             'averagePace' => self::calculateAveragePace($averageSpeed),
             'totalPoints' => $totalPoints,
-            'speedDistribution' => self::$speedDistribution,
-            'elevationProfile' => $elevationProfile
+            'speedDistribution' => $speedDistribution,
+            'elevationProfile' => $elevationProfile,
+        ];
+    }
+
+    private static function emptySpeedDistribution(): array
+    {
+        return [
+            '0-5' => 0,
+            '5-10' => 0,
+            '10-15' => 0,
+            '15-20' => 0,
+            '20+' => 0,
         ];
     }
 
     /**
-     * Oblicza statystyki dla pojedynczego segmentu
+     * Oblicza statystyki dla pojedynczego segmentu.
+     *
      * @param Point[] $points
+     *
      * @return array{
      *      distance: float,
      *      elevationGain: float,
@@ -149,13 +159,13 @@ class StatisticCalculator
                 // Obliczanie dystansu między punktami
                 $pointDistance = self::calculateDistance(
                     $prevPoint,
-                    $point
+                    $point,
                 );
 
                 $distance += $pointDistance;
 
                 // Obliczanie różnicy wysokości
-                $elevationDiff = $point->elevation - $prevPoint->elevation;
+                $elevationDiff = ($point->elevation ?? 0) - ($prevPoint->elevation ?? 0);
                 if ($elevationDiff > 0) {
                     $elevationGain += $elevationDiff;
                 } else {
@@ -163,23 +173,25 @@ class StatisticCalculator
                 }
 
                 // Obliczanie prędkości między punktami
-                $timeDiff = $point->time->getTimestamp() - $prevPoint->time->getTimestamp();
-                if ($timeDiff > 0) {
-                    // Prędkość w km/h
-                    $speed = ($pointDistance / 1000) / ($timeDiff / 3600);
-                    $speeds[] = $speed;
+                if (null !== $point->time && null !== $prevPoint->time) {
+                    $timeDiff = $point->time->getTimestamp() - $prevPoint->time->getTimestamp();
+                    if ($timeDiff > 0) {
+                        // Prędkość w km/h
+                        $speed = ($pointDistance / 1000) / ($timeDiff / 3600);
+                        $speeds[] = $speed;
+                    }
                 }
 
                 // Dodawanie punktu do profilu wysokościowego
                 $elevationPoints[] = [
                     'distance' => $distance,
-                    'elevation' => $point->elevation
+                    'elevation' => $point->elevation ?? 0,
                 ];
             } else {
                 // Pierwszy punkt profilu wysokościowego
                 $elevationPoints[] = [
                     'distance' => 0,
-                    'elevation' => $point->elevation
+                    'elevation' => $point->elevation ?? 0,
                 ];
             }
 
@@ -191,7 +203,7 @@ class StatisticCalculator
             'elevationGain' => $elevationGain,
             'elevationLoss' => $elevationLoss,
             'speeds' => $speeds,
-            'elevationPoints' => $elevationPoints
+            'elevationPoints' => $elevationPoints,
         ];
     }
 
@@ -200,11 +212,11 @@ class StatisticCalculator
         $dLat = deg2rad($secondPoint->latitude - $firstPoint->latitude);
         $dLon = deg2rad($secondPoint->longitude - $firstPoint->longitude);
 
-        $a = sin($dLat / 2) * sin($dLat / 2) +
-            cos(deg2rad($firstPoint->latitude)) * cos(deg2rad($secondPoint->latitude)) *
-            sin($dLon / 2) * sin($dLon / 2);
+        $a = sin($dLat / 2) * sin($dLat / 2)
+            + cos(deg2rad($firstPoint->latitude)) * cos(deg2rad($secondPoint->latitude))
+            * sin($dLon / 2) * sin($dLon / 2);
 
-        return 2 * self::EARTH_RADIUS * atan2(sqrt($a), sqrt(1 - $a));// dystans w metrach
+        return 2 * self::EARTH_RADIUS * atan2(sqrt($a), sqrt(1 - $a)); // dystans w metrach
     }
 
     /**
@@ -213,7 +225,7 @@ class StatisticCalculator
     public static function detectRestPeriods(
         array $points,
         float $speedThreshold = 0.5,
-        int $minDuration = 120
+        int $minDuration = 120,
     ): array {
         $restPeriods = [];
         $restStart = null;
@@ -224,7 +236,7 @@ class StatisticCalculator
                 $timeDiff = $point->time->getTimestamp() - $prevPoint->time->getTimestamp();
                 $distance = self::calculateDistance(
                     $prevPoint,
-                    $point
+                    $point,
                 );
 
                 // Prędkość w km/h
@@ -232,18 +244,18 @@ class StatisticCalculator
 
                 // Jeśli prędkość poniżej progu, to potencjalny odpoczynek
                 if ($speed < $speedThreshold) {
-                    if ($restStart === null) {
+                    if (null === $restStart) {
                         $restStart = $prevPoint->time;
                     }
                 } else {
                     // Jeśli wcześniej był odpoczynek, sprawdź, czy był wystarczająco długi
-                    if ($restStart !== null) {
+                    if (null !== $restStart) {
                         $restDuration = $prevPoint->time->getTimestamp() - $restStart->getTimestamp();
                         if ($restDuration >= $minDuration) {
                             $restPeriods[] = [
                                 'start' => $restStart,
                                 'end' => $prevPoint->time,
-                                'duration' => $restDuration
+                                'duration' => $restDuration,
                             ];
                         }
                         $restStart = null;
@@ -255,13 +267,13 @@ class StatisticCalculator
         }
 
         // Sprawdź, czy ostatni okres odpoczynku się zakończył
-        if ($restStart !== null && $prevPoint !== null) {
+        if (null !== $restStart && null !== $prevPoint) {
             $restDuration = $prevPoint->time->getTimestamp() - $restStart->getTimestamp();
             if ($restDuration >= $minDuration) {
                 $restPeriods[] = [
                     'start' => $restStart,
                     'end' => $prevPoint->time,
-                    'duration' => $restDuration
+                    'duration' => $restDuration,
                 ];
             }
         }
@@ -270,7 +282,7 @@ class StatisticCalculator
     }
 
     /**
-     * Oblicza tempo poruszania się (min/km) z wyłączeniem okresów odpoczynku
+     * Oblicza tempo poruszania się (min/km) z wyłączeniem okresów odpoczynku.
      */
     public static function calculateMovingPace(float $totalDistance, int $totalDuration, array $restPeriods): float
     {
@@ -289,7 +301,8 @@ class StatisticCalculator
     }
 
     /**
-     * Wykrywa segmenty o znaczącym podejściu lub zejściu
+     * Wykrywa segmenty o znaczącym podejściu lub zejściu.
+     *
      * @param Point[] $points
      */
     public function detectSteepSegments(array $points, float $gradeThreshold = 10): array
@@ -304,7 +317,7 @@ class StatisticCalculator
             if ($prevPoint) {
                 $distance = $this->calculateDistance(
                     $prevPoint,
-                    $point
+                    $point,
                 );
 
                 $elevationDiff = $point->elevation - $prevPoint->elevation;
@@ -315,8 +328,8 @@ class StatisticCalculator
                     $type = $grade > 0 ? 'climb' : 'descent';
 
                     // Jeśli nie mamy aktualnego segmentu lub zmienił się typ
-                    if ($currentSegment === null || $currentSegment['type'] !== $type) {
-                        if ($currentSegment !== null && $segmentDistance > 50) {
+                    if (null === $currentSegment || $currentSegment['type'] !== $type) {
+                        if (null !== $currentSegment && $segmentDistance > 50) {
                             $currentSegment['distance'] = $segmentDistance;
                             $currentSegment['elevationChange'] = $segmentElevation;
                             $currentSegment['grade'] = ($segmentElevation / $segmentDistance) * 100;
@@ -330,8 +343,8 @@ class StatisticCalculator
                             'startPosition' => [
                                 'lat' => $prevPoint->latitude,
                                 'lon' => $prevPoint->longitude,
-                                'ele' => $prevPoint->elevation
-                            ]
+                                'ele' => $prevPoint->elevation,
+                            ],
                         ];
 
                         $segmentDistance = $distance;
@@ -340,7 +353,7 @@ class StatisticCalculator
                         $segmentDistance += $distance;
                         $segmentElevation += $elevationDiff;
                     }
-                } elseif ($currentSegment !== null && $segmentDistance > 50) {
+                } elseif (null !== $currentSegment && $segmentDistance > 50) {
                     $currentSegment['distance'] = $segmentDistance;
                     $currentSegment['elevationChange'] = $segmentElevation;
                     $currentSegment['grade'] = ($segmentElevation / $segmentDistance) * 100;
@@ -348,7 +361,7 @@ class StatisticCalculator
                     $currentSegment['endPosition'] = [
                         'lat' => $point->latitude,
                         'lon' => $point->longitude,
-                        'ele' => $point->elevation
+                        'ele' => $point->elevation,
                     ];
                     $steepSegments[] = $currentSegment;
                     $currentSegment = null;
@@ -359,7 +372,7 @@ class StatisticCalculator
         }
 
         // Zamknij ostatni segment, jeśli istnieje
-        if ($currentSegment !== null && $segmentDistance > 50) {
+        if (null !== $currentSegment && $segmentDistance > 50) {
             $currentSegment['distance'] = $segmentDistance;
             $currentSegment['elevationChange'] = $segmentElevation;
             $currentSegment['grade'] = ($segmentElevation / $segmentDistance) * 100;
@@ -367,7 +380,7 @@ class StatisticCalculator
             $currentSegment['endPosition'] = [
                 'lat' => $prevPoint->latitude,
                 'lon' => $prevPoint->longitude,
-                'ele' => $prevPoint->elevation
+                'ele' => $prevPoint->elevation,
             ];
             $steepSegments[] = $currentSegment;
         }
@@ -377,20 +390,18 @@ class StatisticCalculator
 
     public static function calculateAveragePace(float $averageSpeed): string
     {
-        {
         if ($averageSpeed <= 0) {
-            return "Niepoprawna prędkość";
+            return 'Niepoprawna prędkość';
         }
 
-            // Oblicz czas potrzebny na przebiegnięcie 1 km
-            $czas_sekundy = 1000 / $averageSpeed;
+        // Oblicz czas potrzebny na przebiegnięcie 1 km
+        $czas_sekundy = 1000 / $averageSpeed;
 
-            // Konwersja na minuty i sekundy
-            $minuty = floor($czas_sekundy / 60);
-            $sekundy = round($czas_sekundy % 60);
+        // Konwersja na minuty i sekundy
+        $minuty = floor($czas_sekundy / 60);
+        $sekundy = round(fmod($czas_sekundy, 60.0));
 
-            // Formatowanie wyniku w postaci "min:sek"
-            return sprintf("%d:%02d min/km", $minuty, $sekundy);
-        }
+        // Formatowanie wyniku w postaci "min:sek"
+        return sprintf('%d:%02d min/km', $minuty, $sekundy);
     }
 }

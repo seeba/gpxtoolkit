@@ -11,7 +11,7 @@ abstract class AbstractPoint
     protected function __construct(
         public float $latitude,
         public float $longitude,
-        public float $elevation,
+        public ?float $elevation,
         public ?DateTimeImmutable $time = null,
     ) {
     }

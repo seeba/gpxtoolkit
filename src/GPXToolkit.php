@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace GpxToolkit;
 
 use GpxToolkit\Services\File\FileHandlerRegistry;
-use GpxToolkit\Services\Model\WorkoutDataInterface;
 use GpxToolkit\Services\Middleware\MiddlewareInterface;
+use GpxToolkit\Services\Model\WorkoutDataInterface;
 
 class GPXToolkit
 {
@@ -17,6 +17,8 @@ class GPXToolkit
     public static function configure(array $beforeMiddlewares = [], array $afterMiddlewares = []): void
     {
         GpxToolkitInitializer::initialize();
+        GpxToolkitInitializer::resetMiddleware();
+
         foreach ($afterMiddlewares as $middleware) {
             GpxToolkitInitializer::registerAfterParsingMiddleware($middleware);
         }
@@ -25,16 +27,15 @@ class GPXToolkit
             GpxToolkitInitializer::registerBeforeParsingMiddleware($middleware);
         }
     }
-    /**
-     * @param string $path
-     * @return WorkoutDataInterface
-     */
-    public static function parse(
-        string $path,
 
-    ): WorkOutDataInterface {
+    public static function parse(string $path): WorkoutDataInterface
+    {
+        GpxToolkitInitializer::initialize();
+
         $file = FileHandlerRegistry::createFileHandler($path);
+        $file = self::executeMiddleware($file, GpxToolkitInitializer::getBeforeParsingMiddleware());
         $parser = FileHandlerRegistry::getParser($file->getExtension());
+
         return self::executeMiddleware($parser->parse($file), GpxToolkitInitializer::getAfterParsingMiddleware());
     }
 

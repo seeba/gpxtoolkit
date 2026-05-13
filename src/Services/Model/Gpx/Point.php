@@ -11,7 +11,7 @@ use SimpleXMLElement;
 
 class Point extends AbstractPoint implements GpxElementInterface
 {
-    private function __construct(
+    protected function __construct(
         float $latitude,
         float $longitude,
         ?float $elevation = null,
@@ -91,9 +91,9 @@ class Point extends AbstractPoint implements GpxElementInterface
         );
     }
 
-    public static function parse(SimpleXMLElement $element): self
+    public static function parse(SimpleXMLElement $element): static
     {
-        return new self(
+        return new static(
             (float)$element['lat'],
             (float)$element['lon'],
             isset($element->ele) ? ((float)$element->ele) : null,

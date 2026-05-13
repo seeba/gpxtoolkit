@@ -10,12 +10,12 @@ use GpxToolkit\Services\Model\Gpx\Metadata;
 
 class CreateBoundsIfNotExistMiddleware implements MiddlewareInterface
 {
-     /**
+    /**
      * @param Gpx $data
      */
     public function handle(mixed $data, callable $next): mixed
     {
-        if ($data?->metadata?->bounds === null) {
+        if (null === $data?->metadata?->bounds) {
             $minLat = INF;
             $maxLat = -INF;
             $minLon = INF;
@@ -32,13 +32,17 @@ class CreateBoundsIfNotExistMiddleware implements MiddlewareInterface
                 }
             }
 
+            if (INF === $minLat || INF === $minLon || $maxLat === -INF || $maxLon === -INF) {
+                return $next($data);
+            }
+
             if (!isset($data->metadata)) {
                 $data->setMetadata(Metadata::create(
-                    bounds: Bounds::create($minLat, $minLon, $maxLat, $maxLon)
+                    bounds: Bounds::create($minLat, $minLon, $maxLat, $maxLon),
                 ));
             } else {
                 $data->metadata->setBounds(
-                    Bounds::create($minLat, $minLon, $maxLat, $maxLon)
+                    Bounds::create($minLat, $minLon, $maxLat, $maxLon),
                 );
             }
         }

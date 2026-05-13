@@ -7,7 +7,7 @@ namespace GpxToolkit\Services\Model\Gpx;
 abstract readonly class PointsCollection
 {
     protected function __construct(
-        public string $name,
+        public ?string $name,
         public ?string $comment = null,
         public ?string $description = null,
         public ?string $source = null,

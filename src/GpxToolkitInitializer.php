@@ -25,6 +25,12 @@ class GpxToolkitInitializer
         FileHandlerRegistry::registerHandler('gpx', GpxFile::class, GpxParser::class);
     }
 
+    public static function resetMiddleware(): void
+    {
+        self::$beforeParsingMiddleware = [];
+        self::$afterParsingMiddleware = [];
+    }
+
     public static function registerBeforeParsingMiddleware(MiddlewareInterface $middleware): void
     {
         self::$beforeParsingMiddleware[] = $middleware;
