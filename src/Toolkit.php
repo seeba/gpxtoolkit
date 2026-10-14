@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace GpxToolkit;
 
+use GpxToolkit\Exception\LimitExceededException;
 use GpxToolkit\Exception\ReadException;
 use GpxToolkit\Internal\GpxReader;
 use GpxToolkit\Middleware\Middleware;
@@ -49,6 +50,12 @@ final readonly class Toolkit
             throw ReadException::notAFile($path);
         }
 
+        $maxBytes = $this->options->maxBytes;
+        $size = @filesize($path);
+        if (null !== $maxBytes && false !== $size && $size > $maxBytes) {
+            throw LimitExceededException::size($path, $maxBytes);
+        }
+
         $stream = @fopen($path, 'rb');
         if (false === $stream) {
             throw ReadException::unreadable($path, error_get_last()['message'] ?? null);
@@ -71,6 +78,7 @@ final readonly class Toolkit
 
     /**
      * Reads the stream from its current position to the end. The stream is not closed.
+     * With a size limit, at most the limit plus one byte is read.
      *
      * @param resource $stream
      * @param string   $sourceName used in error messages only
@@ -81,9 +89,13 @@ final readonly class Toolkit
             throw new InvalidArgumentException('Expected an open stream resource.');
         }
 
-        $content = @stream_get_contents($stream);
+        $maxBytes = $this->options->maxBytes;
+        $content = @stream_get_contents($stream, null === $maxBytes ? null : $maxBytes + 1);
         if (false === $content) {
             throw ReadException::unreadable($sourceName, error_get_last()['message'] ?? null);
+        }
+        if (null !== $maxBytes && strlen($content) > $maxBytes) {
+            throw LimitExceededException::size($sourceName, $maxBytes);
         }
 
         return $this->parseString($content, $sourceName);

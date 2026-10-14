@@ -16,8 +16,41 @@ jest jeszcze w toku zgodnie z planem wydania.
   `ValidationException`, również w trybie zgodności.
 - Atrybut `creator` jest wymagany przez XSD, ale biblioteka go nie wymaga;
   brak daje pusty string.
-- Walidacja XSD nie jest wykonywana. Biblioteka waliduje model, nie kolejność
-  elementów: nieznane elementy w namespace GPX są pomijane.
+- Walidacja XSD nie jest wykonywana. Biblioteka waliduje wartości i wymagane
+  atrybuty, nie kolejność elementów: nieznane elementy są pomijane, a przy
+  powtórzonym elemencie pojedynczym (np. dwóch `<name>`) liczy się pierwszy.
+
+### Składnia wartości
+
+- Liczby dziesiętne: `xsd:decimal` (`[+-]?cyfry[.cyfry]`), białe znaki na
+  brzegach są ignorowane. Notacja wykładnicza, `NaN` i `INF` są odrzucane.
+- Liczby całkowite: `[+-]?cyfry` w zakresie `int` PHP.
+- Czas: `xsd:dateTime` (`YYYY-MM-DDThh:mm:ss[.ułamek][Z|±hh:mm]`) z poprawną
+  datą kalendarzową, godziną 00–23 i sekundą 00–59. Czas bez strefy jest
+  traktowany jako UTC (specyfikacja GPX). Ułamek sekundy jest obcinany do
+  mikrosekund. Ogólny parser dat PHP nie jest używany.
+- `copyright/year`: `xsd:gYear`, przechowywany jako `int`.
+- `fix`: jedna z wartości `none`, `2d`, `3d`, `dgps`, `pps`.
+- Teksty (`name`, `desc` itd.) są przechowywane bez zmian, łącznie z białymi znakami.
+
+### Wymagane atrybuty i zakresy
+
+| Element | Wymagane | Zakres |
+|---|---|---|
+| `wpt`, `rtept`, `trkpt` | `lat`, `lon` | lat −90…90, lon −180…180 (180 włącznie, mimo `maxExclusive` w XSD) |
+| `bounds` | `minlat`, `minlon`, `maxlat`, `maxlon` | jak wyżej; minimum ≤ maksimum |
+| `link` | `href` | — |
+| `email` | `id`, `domain` | — |
+| `copyright` | `author` | — |
+| `magvar` | — | 0 ≤ x < 360 |
+| `sat`, `number` | — | ≥ 0 |
+| `dgpsid` | — | 0…1023 |
+
+Obszar przekraczający południk 180° nie jest wspierany: `Bounds` wymaga
+`minLongitude ≤ maxLongitude`, więc metadane z takim obszarem są odrzucane.
+
+Te same niezmienniki sprawdzają publiczne konstruktory `Point`, `Bounds`,
+`Track` i `Route` (`ValidationException` bez `source` i `elementPath`).
 
 ## Źródła wejścia
 
@@ -26,12 +59,27 @@ samego parsera i dają identyczny model dla tej samej treści. Rozszerzenie plik
 nie ma znaczenia. Strumień jest czytany od bieżącej pozycji do końca i nie jest
 zamykany. Nazwa źródła (ścieżka lub `sourceName`) służy wyłącznie komunikatom błędów.
 
-Polityka XML **[etap 2]**: bez dostępu do sieci (`LIBXML_NONET`), bez rozwijania
-encji zewnętrznych i ładowania DTD; dokument z `DOCTYPE` jest odrzucany
-`XmlParseException`. Konfigurowalne limity rozmiaru treści i liczby punktów.
-Limit rozmiaru sprawdzany przed wczytaniem całej treści; limit punktów przed
-budową modelu, ale po zbudowaniu drzewa XML — przed zużyciem pamięci chroni
-wyłącznie limit rozmiaru.
+### Polityka XML
+
+- Bez dostępu do sieci (`LIBXML_NONET`), bez rozwijania encji (`LIBXML_NOENT`)
+  i ładowania DTD (`LIBXML_DTDLOAD`), bez zniesienia limitów libxml
+  (`LIBXML_PARSEHUGE`).
+- Dokument z deklaracją `DOCTYPE` jest odrzucany `XmlParseException` —
+  sprawdzane w prologu przed parsowaniem oraz w drzewie po parsowaniu
+  (obejmuje kodowania inne niż UTF-8).
+- Stan obsługi błędów libxml jest przywracany także przy wyjątkach.
+
+### Limity (`ToolkitOptions`)
+
+| Opcja | Domyślnie | Sprawdzana |
+|---|---|---|
+| `maxBytes` | 32 MiB | przed odczytem: rozmiar pliku, długość stringa; ze strumienia czytane jest najwyżej `maxBytes + 1` bajtów |
+| `maxPoints` | 1 000 000 | łączna liczba `wpt`, `rtept`, `trkpt` przed budową modelu |
+
+`null` wyłącza limit. Przekroczenie daje `LimitExceededException`. Limit
+punktów jest sprawdzany po zbudowaniu drzewa XML, więc przed zużyciem pamięci
+przez parser chroni wyłącznie `maxBytes`. Wartości domyślne zostaną
+zweryfikowane pomiarami przed wydaniem 1.0.
 
 ## Rodzaje dokumentów
 
@@ -52,7 +100,7 @@ Gwarancja kompatybilności 1.x obejmuje:
   `Copyright`, `Bounds`, `Point`, `Route`, `Track`, `TrackSegment`,
   `Extensions`, `FixType`
 - `GpxToolkit\Exception\*`: `GpxToolkitException` (interfejs), `ReadException`,
-  `XmlParseException`, `ValidationException`
+  `XmlParseException`, `ValidationException`, `LimitExceededException`
 - `GpxToolkit\Middleware\Middleware` i dostarczone middleware
 - `GpxToolkit\Analysis\*` i `GpxToolkit\Geometry\*`
 
@@ -70,14 +118,18 @@ argumenty należy przekazywać nazwane, jeśli pomija się parametry opcjonalne.
 - Waypointy, punkty tras i punkty śladów to ta sama klasa `Point` (`wptType`).
 - Pola opcjonalne mają wartość `null`, gdy element nie występuje. Brak
   pomiaru nigdy nie jest zamieniany na `0`; zero w pliku jest poprawnym pomiarem.
-- `<extensions>` jest zachowywane w surowej postaci w `Extensions` na poziomie
-  dokumentu, metadanych, śladu, segmentu, trasy i punktu **[etap 2]**.
+- `<extensions>` jest zachowywane bez interpretacji w `Extensions` na poziomie
+  dokumentu, metadanych, śladu, segmentu, trasy i punktu. `Extensions::$elements`
+  to lista elementów potomnych, każdy jako samodzielny fragment XML deklarujący
+  wszystkie używane namespace'y (np. `<gpxtpx:hr xmlns:gpxtpx="…">120</gpxtpx:hr>`).
+  Tekst poza elementami potomnymi jest pomijany. Brak `<extensions>` to `null`,
+  pusty element to pusta lista.
 
 | Element GPX | Pole | Jednostka / typ |
 |---|---|---|
-| `@lat`, `@lon` | `latitude`, `longitude` | stopnie dziesiętne WGS 84; zakres −90…90 i −180…180 **[etap 2]** |
+| `@lat`, `@lon` | `latitude`, `longitude` | stopnie dziesiętne WGS 84 |
 | `ele` | `elevation` | metry |
-| `time` | `time` | `DateTimeImmutable` ze strefą z pliku; składnia `xsd:dateTime` **[etap 2]** |
+| `time` | `time` | `DateTimeImmutable` ze strefą z pliku (UTC, gdy brak) |
 | `magvar` | `magneticVariation` | stopnie |
 | `geoidheight` | `geoidHeight` | metry |
 | `cmt`, `desc`, `src`, `sym` | `comment`, `description`, `source`, `symbol` | tekst |
@@ -109,10 +161,16 @@ Każdy wyjątek biblioteki implementuje `GpxToolkitException`.
 | `ReadException` (`RuntimeException`) | brak pliku, katalog zamiast pliku, błąd odczytu | `source` |
 | `XmlParseException` (`RuntimeException`) | XML niepoprawny składniowo lub naruszający politykę XML | `source`, `xmlLine` |
 | `ValidationException` (`InvalidArgumentException`) | poprawny XML niezgodny z kontraktem, niepoprawne dane modelu lub wejścia narzędzi | `source`, `elementPath` |
+| `LimitExceededException` (`RuntimeException`) | przekroczony `maxBytes` lub `maxPoints` | `source`, `limit` |
+
+`elementPath` ma postać XPath z indeksami od 1, np.
+`/gpx/trk[1]/trkseg[2]/trkpt[15]/ele` dla błędnej wartości elementu,
+`/gpx/wpt[3]/@lat` dla błędnej składni atrybutu lub `/gpx/wpt[3]` dla
+naruszenia zakresu albo braku wymaganego atrybutu.
 
 Komunikaty nie zawierają treści dokumentu. Biblioteka nie emituje ostrzeżeń PHP
 i przywraca stan obsługi błędów libxml. Wyjątki PHP (`ValueError`, `Exception`
-z parsera dat) nie wydostają się z parsera **[etap 2]**. Przekazanie do
+z parsera dat) nie wydostają się z parsera. Przekazanie do
 `parseStream()` czegoś innego niż strumień to błąd programisty
 (`InvalidArgumentException` spoza hierarchii biblioteki).
 
@@ -158,12 +216,12 @@ Pliki w `tests/Fixtures/gpx/`.
 | `namespace-prefixed.gpx` | czytany jak domyślny namespace |
 | `namespace-missing.gpx` | `ValidationException`; w trybie zgodności poprawny |
 | `namespace-other.gpx`, `gpx-1.0.gpx` | `ValidationException` |
-| `missing-time-elevation.gpx` | braki jako `null`; zero to pomiar **[etap 3]** |
-| `invalid-coordinates.gpx` | `ValidationException` ze ścieżką elementu **[etap 2]** |
-| `invalid-time.gpx`, `invalid-fix.gpx` | `ValidationException` ze ścieżką elementu **[etap 2]** |
+| `missing-time-elevation.gpx` | braki jako `null`, zero to pomiar; obliczenia **[etap 3]** |
+| `invalid-coordinates.gpx` | `ValidationException` ze ścieżką elementu |
+| `invalid-time.gpx`, `invalid-fix.gpx` | `ValidationException` ze ścieżką elementu |
 | `malformed.gpx` | `XmlParseException` z numerem linii |
-| `doctype-entities.gpx` | `XmlParseException`, bez odczytu plików i sieci **[etap 2]** |
-| `extensions.gpx` | surowe extensions z namespace zachowane **[etap 2]** |
+| `doctype-entities.gpx` | `XmlParseException`, bez odczytu plików i sieci |
+| `extensions.gpx` | surowe extensions z namespace zachowane |
 
 ## Migracja z 0.x
 

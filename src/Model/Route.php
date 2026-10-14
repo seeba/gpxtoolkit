@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace GpxToolkit\Model;
 
+use GpxToolkit\Internal\Assert;
+
 /**
  * GPX 1.1 rteType: an ordered list of points leading to a destination.
  */
@@ -24,6 +26,7 @@ final readonly class Route
         public ?Extensions $extensions = null,
         public array $points = [],
     ) {
+        Assert::nonNegative($number, 'number');
     }
 
     /**

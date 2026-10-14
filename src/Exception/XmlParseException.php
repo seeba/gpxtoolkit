@@ -27,4 +27,12 @@ final class XmlParseException extends RuntimeException implements GpxToolkitExce
             $line,
         );
     }
+
+    public static function doctype(string $source): self
+    {
+        return new self(
+            sprintf('GPX source "%s" contains a DOCTYPE declaration; DTDs and entities are not supported.', $source),
+            $source,
+        );
+    }
 }

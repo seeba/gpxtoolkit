@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace GpxToolkit\Model;
 
+use GpxToolkit\Internal\Assert;
+
 /**
  * GPX 1.1 trkType: a recorded path made of one or more segments.
  */
@@ -24,6 +26,7 @@ final readonly class Track
         public ?Extensions $extensions = null,
         public array $segments = [],
     ) {
+        Assert::nonNegative($number, 'number');
     }
 
     /**
