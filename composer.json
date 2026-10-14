@@ -1,8 +1,6 @@
 {
   "name": "seeba/gpxtoolkit",
-  "description": "A PHP library for parsing and manipulating GPX files.",
-  "minimum-stability": "dev",
-  "prefer-stable": true,
+  "description": "A PHP library for parsing and analysing GPX 1.1 files.",
   "type": "library",
   "license": "MIT",
   "authors": [
@@ -22,12 +20,15 @@
     }
   },
   "require": {
-    "php": "^8.3",
+    "php": "^8.4",
+    "ext-dom": "*",
     "ext-libxml": "*",
-    "ext-simplexml": "*",
-    "ext-fileinfo": "*"
+    "ext-simplexml": "*"
   },
   "require-dev": {
     "phpunit/phpunit": "^13.0"
+  },
+  "config": {
+    "sort-packages": true
   }
 }

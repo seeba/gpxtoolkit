@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="GpxToolkit fixtures" xmlns="http://www.topografix.com/GPX/1/1">
+  <rte>
+    <name>Same path as route</name>
+    <rtept lat="50.000" lon="19.000"/>
+    <rtept lat="50.010" lon="19.000"/>
+  </rte>
+  <trk>
+    <name>Same path as track</name>
+    <trkseg>
+      <trkpt lat="50.000" lon="19.000"><time>2026-05-13T10:00:00Z</time></trkpt>
+      <trkpt lat="50.010" lon="19.000"><time>2026-05-13T10:10:00Z</time></trkpt>
+    </trkseg>
+  </trk>
+</gpx>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="GpxToolkit fixtures" xmlns="http://www.topografix.com/GPX/1/1">
+  <trk>
+    <name>Day 1</name>
+    <trkseg>
+      <trkpt lat="50.000" lon="19.000"><ele>200</ele><time>2026-05-13T08:00:00Z</time></trkpt>
+      <trkpt lat="50.010" lon="19.000"><ele>220</ele><time>2026-05-13T08:15:00Z</time></trkpt>
+    </trkseg>
+    <trkseg>
+      <trkpt lat="50.020" lon="19.000"><ele>240</ele><time>2026-05-13T09:00:00Z</time></trkpt>
+      <trkpt lat="50.030" lon="19.000"><ele>230</ele><time>2026-05-13T09:15:00Z</time></trkpt>
+    </trkseg>
+    <trkseg/>
+  </trk>
+  <trk>
+    <name>Day 2</name>
+    <trkseg>
+      <trkpt lat="50.030" lon="19.000"><ele>230</ele><time>2026-05-14T08:00:00Z</time></trkpt>
+    </trkseg>
+  </trk>
+</gpx>

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="GpxToolkit fixtures" xmlns="http://www.topografix.com/GPX/1/1">
+  <wpt lat="49.2321" lon="19.9817">
+    <ele>1987.5</ele>
+    <time>2026-05-13T10:00:00.250+02:00</time>
+    <magvar>4.5</magvar>
+    <geoidheight>41.2</geoidheight>
+    <name>Kasprowy Wierch</name>
+    <cmt>summit</cmt>
+    <desc>Summit waypoint</desc>
+    <src>map</src>
+    <link href="https://example.com/kasprowy"><text>Kasprowy</text><type>text/html</type></link>
+    <link href="https://example.com/kasprowy-2"/>
+    <sym>Summit</sym>
+    <type>peak</type>
+    <fix>3d</fix>
+    <sat>9</sat>
+    <hdop>0.9</hdop>
+    <vdop>1.2</vdop>
+    <pdop>1.5</pdop>
+    <ageofdgpsdata>2.5</ageofdgpsdata>
+    <dgpsid>17</dgpsid>
+  </wpt>
+</gpx>

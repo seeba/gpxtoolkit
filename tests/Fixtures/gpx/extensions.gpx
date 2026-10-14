@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="GpxToolkit fixtures" xmlns="http://www.topografix.com/GPX/1/1" xmlns:gpxtpx="http://www.garmin.com/xmlschemas/TrackPointExtension/v1">
+  <extensions><custom xmlns="urn:example:custom" level="document">value</custom></extensions>
+  <trk>
+    <trkseg>
+      <trkpt lat="50.000" lon="19.000">
+        <ele>200</ele>
+        <extensions>
+          <gpxtpx:TrackPointExtension><gpxtpx:hr>120</gpxtpx:hr><gpxtpx:cad>80</gpxtpx:cad></gpxtpx:TrackPointExtension>
+        </extensions>
+      </trkpt>
+      <extensions><gpxtpx:segmentNote>segment</gpxtpx:segmentNote></extensions>
+    </trkseg>
+  </trk>
+</gpx>
