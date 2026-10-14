@@ -26,6 +26,8 @@
     "ext-simplexml": "*"
   },
   "require-dev": {
+    "phpstan/phpstan": "^2.1",
+    "phpstan/phpstan-phpunit": "^2.0",
     "phpunit/phpunit": "^13.0"
   },
   "config": {

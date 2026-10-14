@@ -251,8 +251,8 @@ final class ToolkitTest extends TestCase
         try {
             (new Toolkit())->parseFile(Fixtures::path('malformed.gpx'));
             self::fail('Expected malformed XML to be rejected.');
-        } catch (XmlParseException $exception) {
-            self::assertInstanceOf(GpxToolkitException::class, $exception);
+        } catch (GpxToolkitException $exception) {
+            self::assertInstanceOf(XmlParseException::class, $exception);
             self::assertSame(Fixtures::path('malformed.gpx'), $exception->source);
             self::assertNotNull($exception->xmlLine);
             self::assertStringContainsString('Invalid XML in GPX source', $exception->getMessage());

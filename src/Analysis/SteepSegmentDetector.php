@@ -64,7 +64,7 @@ final readonly class SteepSegmentDetector
             $previousElevation = $point->elevation;
         }
 
-        if (null !== $current && null !== $previous) {
+        if (null !== $current) {
             $this->close($segments, $current, $previous);
         }
 

@@ -6,96 +6,138 @@ namespace GpxToolkit\Analysis;
 
 use DateTimeImmutable;
 use GpxToolkit\Geometry\Distance;
+use GpxToolkit\Geometry\Line;
+use GpxToolkit\Geometry\Lines;
+use GpxToolkit\Geometry\Scope;
+use GpxToolkit\Internal\Time;
 use GpxToolkit\Model\Document;
-use GpxToolkit\Model\Point;
+use GpxToolkit\Model\Route;
+use GpxToolkit\Model\Track;
 
-final class StatisticsCalculator
+/**
+ * Computes statistics line by line (track segment or route) and aggregates them.
+ * Point order is taken from the document and never changed.
+ */
+final readonly class StatisticsCalculator
 {
-    public function calculate(Document $document): Statistics
+    public function __construct(
+        private RestPeriodDetector $restPeriodDetector = new RestPeriodDetector(),
+    ) {
+    }
+
+    public function calculate(Document $document, Scope $scope = Scope::Tracks): Statistics
     {
-        $distance = 0.0;
-        $elevationGain = 0.0;
-        $elevationLoss = 0.0;
+        return $this->calculateLines(Lines::fromDocument($document, $scope), $scope);
+    }
+
+    public function calculateTrack(Track $track): Statistics
+    {
+        return $this->calculateLines(Lines::fromTrack($track), Scope::Tracks);
+    }
+
+    public function calculateRoute(Route $route): Statistics
+    {
+        return $this->calculateLines([Lines::fromRoute($route)], Scope::Routes);
+    }
+
+    /**
+     * @param list<Line> $lines
+     */
+    public function calculateLines(array $lines, Scope $scope): Statistics
+    {
         $pointCount = 0;
-        $elevationProfile = [];
-        $speedDistribution = ['0-5' => 0, '5-10' => 0, '10-15' => 0, '15-20' => 0, '20+' => 0];
-        $firstTime = null;
-        $lastTime = null;
+        $pairCount = 0;
+        $distance = 0.0;
+        $gain = 0.0;
+        $loss = 0.0;
+        $elevationPairCount = 0;
+        $minElevation = null;
+        $maxElevation = null;
+        $startTime = null;
+        $endTime = null;
+        $timedPairCount = 0;
+        $timedDuration = 0.0;
+        $timedDistance = 0.0;
+        $nonIncreasingTimePairCount = 0;
+        $restDuration = 0.0;
+        $restDistance = 0.0;
 
-        foreach ($document->tracks as $track) {
-            foreach ($track->segments as $segment) {
-                $points = $segment->points;
-                $pointCount += count($points);
+        foreach ($lines as $line) {
+            $previous = null;
+            foreach ($line->points as $point) {
+                ++$pointCount;
 
-                usort($points, static fn (Point $a, Point $b): int => ($a->time?->getTimestamp() ?? PHP_INT_MAX)
-                    <=> ($b->time?->getTimestamp() ?? PHP_INT_MAX));
-
-                foreach ($points as $point) {
-                    if (null !== $point->time) {
-                        $firstTime = self::earlier($firstTime, $point->time);
-                        $lastTime = self::later($lastTime, $point->time);
-                    }
+                if (null !== $point->elevation) {
+                    $minElevation = null === $minElevation ? $point->elevation : min($minElevation, $point->elevation);
+                    $maxElevation = null === $maxElevation ? $point->elevation : max($maxElevation, $point->elevation);
+                }
+                if (null !== $point->time) {
+                    $startTime = self::earlier($startTime, $point->time);
+                    $endTime = self::later($endTime, $point->time);
                 }
 
-                $previous = null;
-                $segmentDistance = 0.0;
-                foreach ($points as $point) {
-                    if (null !== $previous) {
-                        $pairDistance = Distance::haversineMeters($previous, $point);
-                        $segmentDistance += $pairDistance;
+                if (null !== $previous) {
+                    ++$pairCount;
+                    $pairDistance = Distance::haversineMeters($previous, $point);
+                    $distance += $pairDistance;
 
-                        $elevationDiff = ($point->elevation ?? 0.0) - ($previous->elevation ?? 0.0);
-                        if ($elevationDiff > 0) {
-                            $elevationGain += $elevationDiff;
+                    if (null !== $point->elevation && null !== $previous->elevation) {
+                        ++$elevationPairCount;
+                        $difference = $point->elevation - $previous->elevation;
+                        if ($difference > 0) {
+                            $gain += $difference;
                         } else {
-                            $elevationLoss += abs($elevationDiff);
-                        }
-
-                        if (null !== $point->time && null !== $previous->time) {
-                            $seconds = $point->time->getTimestamp() - $previous->time->getTimestamp();
-                            if ($seconds > 0) {
-                                ++$speedDistribution[self::speedBucket(($pairDistance / 1000) / ($seconds / 3600))];
-                            }
+                            $loss -= $difference;
                         }
                     }
 
-                    $elevationProfile[] = ['distanceMeters' => $segmentDistance, 'elevationMeters' => $point->elevation ?? 0.0];
-                    $previous = $point;
+                    if (null !== $point->time && null !== $previous->time) {
+                        $seconds = Time::seconds($point->time) - Time::seconds($previous->time);
+                        if ($seconds > 0) {
+                            ++$timedPairCount;
+                            $timedDuration += $seconds;
+                            $timedDistance += $pairDistance;
+                        } else {
+                            ++$nonIncreasingTimePairCount;
+                        }
+                    }
                 }
 
-                $distance += $segmentDistance;
+                $previous = $point;
+            }
+
+            foreach ($this->restPeriodDetector->detect($line->points) as $period) {
+                $restDuration += $period->durationSeconds;
+                $restDistance += $period->distanceMeters;
             }
         }
 
-        usort($elevationProfile, static fn (array $a, array $b): int => $a['distanceMeters'] <=> $b['distanceMeters']);
-
-        $duration = null !== $firstTime && null !== $lastTime
-            ? $lastTime->getTimestamp() - $firstTime->getTimestamp()
-            : 0;
-        $averageSpeed = $duration > 0 ? $distance / $duration : 0.0;
+        $duration = null !== $startTime && null !== $endTime
+            ? Time::seconds($endTime) - Time::seconds($startTime)
+            : null;
+        $movingDuration = $timedPairCount > 0 ? $timedDuration - $restDuration : null;
 
         return new Statistics(
-            $distance,
-            $elevationGain,
-            $elevationLoss,
-            $duration,
-            $averageSpeed,
-            $averageSpeed > 0 ? 1000 / $averageSpeed : null,
+            $scope,
+            count($lines),
             $pointCount,
-            $speedDistribution,
-            $elevationProfile,
+            $pairCount,
+            $distance,
+            $elevationPairCount > 0 ? $gain : null,
+            $elevationPairCount > 0 ? $loss : null,
+            $elevationPairCount,
+            $minElevation,
+            $maxElevation,
+            $startTime,
+            $endTime,
+            $duration,
+            $movingDuration,
+            $timedPairCount > 0 ? $restDuration : null,
+            $timedPairCount,
+            $nonIncreasingTimePairCount,
+            null !== $duration && $duration > 0 ? $distance / $duration : null,
+            null !== $movingDuration && $movingDuration > 0 ? ($timedDistance - $restDistance) / $movingDuration : null,
         );
-    }
-
-    private static function speedBucket(float $speedKmh): string
-    {
-        return match (true) {
-            $speedKmh < 5 => '0-5',
-            $speedKmh < 10 => '5-10',
-            $speedKmh < 15 => '10-15',
-            $speedKmh < 20 => '15-20',
-            default => '20+',
-        };
     }
 
     private static function earlier(?DateTimeImmutable $current, DateTimeImmutable $candidate): DateTimeImmutable

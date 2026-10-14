@@ -89,7 +89,7 @@ zweryfikowane pomiarami przed wydaniem 1.0.
 | Poprawny XML, zły korzeń/wersja/namespace | `ValidationException` |
 | `<gpx/>` bez zawartości | poprawny `Document` z pustymi listami |
 | Same metadane, same waypointy, same trasy | poprawny `Document`; parser nie wymaga śladu |
-| Ślad z segmentem pustym lub jednopunktowym | poprawny `Document`; geometria liniowa takiego segmentu jest niedostępna **[etap 3]** |
+| Ślad z segmentem pustym lub jednopunktowym | poprawny `Document`; segment nie ma geometrii liniowej |
 
 ## Publiczne API
 
@@ -174,31 +174,53 @@ z parsera dat) nie wydostają się z parsera. Przekazanie do
 `parseStream()` czegoś innego niż strumień to błąd programisty
 (`InvalidArgumentException` spoza hierarchii biblioteki).
 
-## Semantyka wyników [etap 3]
+## Semantyka wyników
 
-Jednostki: metry, sekundy, metry na sekundę; tempo w sekundach na kilometr.
-Nazwy pól wyników zawierają jednostkę (`distanceMeters`, `durationSeconds`…).
-Wynik niedostępny to `null`, nie `0` ani tekst.
+Jednostki: metry, sekundy (`float`, z mikrosekundami), metry na sekundę; tempo
+w sekundach na kilometr. Nazwy pól wyników zawierają jednostkę. Wynik, którego
+nie da się policzyć z danych, to `null` — nigdy `0` ani tekst.
 
-- **Zakres:** obliczenia dotyczą śladów albo tras — jawnie wybranych, domyślnie
-  śladów. Wynik zawiera użyty zakres. Dokument ze śladem i trasą nie jest
-  sumowany.
-- **Dystans:** suma odległości haversine (kula o promieniu 6 371 000 m) między
-  kolejnymi punktami w obrębie segmentu. Przerwy między segmentami i śladami
-  nie są dystansem.
-- **Przewyższenia:** liczone tylko dla par sąsiednich punktów, które obie mają
-  wysokość. Wynik zawiera liczbę par z pomiarem i informację o kompletności.
-- **Czas:** kolejność punktów pochodzi z pliku i nie jest zmieniana. Czas
-  całkowity to różnica między najpóźniejszym a najwcześniejszym czasem
-  w zakresie. Czas ruchu sumuje tylko pary w obrębie segmentu z rosnącym czasem,
-  z wyłączeniem wykrytych odpoczynków (parametry: próg prędkości, minimalny czas
-  trwania). Pary z czasem malejącym lub równym są pomijane w obliczeniach
-  czasowych i liczone w wyniku.
-- **Profil wysokościowy:** dystans skumulowany w całym zakresie, z indeksem
-  śladu i segmentu przy każdym punkcie; punkty bez wysokości mają `null`.
-- **WKT:** kolejność `longitude latitude`, bez SRID, formatowanie niezależne od
-  locale ze stałą precyzją. Ślad z wieloma segmentami jako `MULTILINESTRING`;
-  segmenty z mniej niż dwoma punktami są pomijane, a brak linii daje `null`.
+- **Zakres (`Geometry\Scope`):** obliczenia dotyczą śladów (`Tracks`, domyślnie)
+  albo tras (`Routes`). Wynik zawiera użyty zakres. Dokument ze śladem i trasą
+  nie jest sumowany.
+- **Linie (`Geometry\Lines`):** ślad dzieli się na segmenty, trasa to jedna linia.
+  Obliczenia przebiegają linia po linii, w kolejności dokumentu; punkty nigdy nie
+  są sortowane. Przerwy między segmentami, śladami i trasami nie są łączone.
+- **Dystans:** suma odległości haversine (kula 6 371 000 m) między kolejnymi
+  punktami w obrębie linii.
+- **Przewyższenia:** tylko dla par sąsiednich punktów z wysokością na obu końcach;
+  `null`, gdy takich par nie ma. `elevationPairCount` i `elevationCompleteness()`
+  (udział takich par, 0…1) informują o kompletności. Zero jest pomiarem.
+- **Czas całkowity (`durationSeconds`):** różnica między najpóźniejszym
+  a najwcześniejszym czasem w zakresie, łącznie z przerwami i nocami między
+  śladami; `null` bez punktów z czasem.
+- **Pary czasowe:** para w obrębie linii z czasem na obu końcach i rosnącym
+  czasem (`timedPairCount`). Pary z czasem malejącym lub równym są pomijane
+  w wynikach czasowych i liczone w `nonIncreasingTimePairCount`. Para, w której
+  brakuje czasu, nie jest parą czasową.
+- **Odpoczynek (`Analysis\RestPeriodDetector`):** ciąg kolejnych par czasowych
+  o prędkości poniżej progu (domyślnie 0,15 m/s) trwający co najmniej minimalny
+  czas (domyślnie 120 s). Para bez czasu lub z czasem nierosnącym przerywa ciąg.
+- **Czas ruchu (`movingDurationSeconds`):** suma czasu par czasowych minus czas
+  odpoczynków; `null` bez par czasowych. Przerwy między liniami nie są ruchem.
+- **Prędkości:** `averageSpeedMetersPerSecond` = dystans / czas całkowity;
+  `movingSpeedMetersPerSecond` = dystans par czasowych poza odpoczynkami / czas
+  ruchu. Tempo (`averagePaceSecondsPerKilometer()`,
+  `movingPaceSecondsPerKilometer()`) to 1000 / prędkość; formatowanie tekstowe
+  wyłącznie przez `Analysis\PaceFormatter`.
+- **Profil wysokościowy (`Analysis\ElevationProfileBuilder`):** każdy punkt
+  zakresu w kolejności dokumentu, ze skumulowanym dystansem (przerwy między
+  liniami nie zwiększają dystansu), wysokością lub `null` oraz indeksami ścieżki,
+  segmentu i punktu.
+- **Bounds (`Geometry\BoundsCalculator`):** wszystkie punkty zakresu; `null`
+  bez punktów.
+- **WKT (`Geometry\WktWriter`):** `longitude latitude`, bez SRID (WGS 84 jest
+  kontraktem, nie częścią tekstu), stała precyzja (domyślnie 7 miejsc, ok. 1 cm)
+  niezależna od locale, bez końcowych zer. Kolejne punkty o tych samych
+  zaokrąglonych współrzędnych są zapisywane raz; linia z mniej niż dwoma
+  różnymi punktami nie ma geometrii. `track()` daje `LINESTRING` dla jednego
+  segmentu z geometrią i `MULTILINESTRING` dla wielu, `route()` — `LINESTRING`,
+  `document()` — zawsze `MULTILINESTRING` z linii zakresu; brak geometrii to `null`.
 
 ## Fixture'y referencyjne
 
@@ -209,14 +231,14 @@ Pliki w `tests/Fixtures/gpx/`.
 | `track.gpx` | jeden ślad, jeden segment, pełne metadane |
 | `full-point.gpx` | każde pole `wptType` zmapowane na `Point` |
 | `route.gpx` | trasa bez czasów |
-| `track-and-route.gpx` | ślad i trasa tego samego przebiegu; statystyki nie sumują zakresów **[etap 3]** |
+| `track-and-route.gpx` | ślad i trasa tego samego przebiegu; statystyki nie sumują zakresów |
 | `waypoints-only.gpx`, `metadata-only.gpx`, `empty-document.gpx` | poprawny dokument bez śladu |
 | `multi-track-multi-segment.gpx` | struktura śladów i segmentów zachowana, w tym pusty segment |
 | `loop.gpx` | pętla: redukcja zachowuje kształt |
 | `namespace-prefixed.gpx` | czytany jak domyślny namespace |
 | `namespace-missing.gpx` | `ValidationException`; w trybie zgodności poprawny |
 | `namespace-other.gpx`, `gpx-1.0.gpx` | `ValidationException` |
-| `missing-time-elevation.gpx` | braki jako `null`, zero to pomiar; obliczenia **[etap 3]** |
+| `missing-time-elevation.gpx` | braki jako `null`, zero to pomiar; przewyższenia `null`, brak czasu ruchu |
 | `invalid-coordinates.gpx` | `ValidationException` ze ścieżką elementu |
 | `invalid-time.gpx`, `invalid-fix.gpx` | `ValidationException` ze ścieżką elementu |
 | `malformed.gpx` | `XmlParseException` z numerem linii |
@@ -235,14 +257,19 @@ Pliki w `tests/Fixtures/gpx/`.
 | `Segment`, `TrackSegment` | `Model\TrackSegment` |
 | `Point::$magVar`, `$satelitesQuantity`, `$dgsid` | `magneticVariation`, `satelliteCount`, `dgpsId` |
 | `Point::$ageOfGpsData` (`int`, czytane z błędnego elementu) | `ageOfDgpsData` (`float`, element `ageofdgpsdata`) |
-| `Point::$wktPoint`, `Track::$wktLineString` | `Geometry\WktWriter` |
+| `Point::$wktPoint`, `Track::$wktLineString` (segmenty sklejone) | `Geometry\WktWriter::point()`, `track()` (segmenty osobno) |
 | `Metadata::$description` (czytane z błędnego elementu `description`) | `description` z elementu `desc` |
 | `Metadata::$time` (`DateTime`), `setBounds()` | `DateTimeImmutable`; model niemutowalny |
-| `Gpx::$statistics`, `PrepareStatisticsMiddleware` | `Analysis\StatisticsCalculator::calculate()` → `Analysis\Statistics` |
+| `Gpx::$statistics`, `PrepareStatisticsMiddleware` | `Analysis\StatisticsCalculator::calculate($document, $scope)` → `Analysis\Statistics` |
+| `Statistics::$totalDistance`, `$totalElevationGain`, `$totalElevationLoss`, `$totalDuration`, `$averageSpeed`, `$totalPoints` | `distanceMeters`, `elevationGainMeters`, `elevationLossMeters`, `durationSeconds`, `averageSpeedMetersPerSecond`, `pointCount` |
+| `Statistics::$speedDistribution` | usunięte |
+| `Statistics::$elevationProfile` (sortowany, dystans od zera w każdym segmencie) | `Analysis\ElevationProfileBuilder` (skumulowany, w kolejności dokumentu) |
 | `CreateBoundsIfNotExistMiddleware` | `Geometry\BoundsCalculator::calculate()` |
 | `CreateWktMiddleware`, `GenerateWkt` | `Geometry\WktWriter` |
 | `ReducePointsMiddleware`, `ReduceGPXPoints` | `Middleware\ReducePointsMiddleware`, `Geometry\PointReducer` |
 | `StatisticCalculator::calculateDistance()` | `Geometry\Distance::haversineMeters()` |
-| `StatisticCalculator::detectRestPeriods()`, `detectSteepSegments()` | `Analysis\RestPeriodDetector`, `Analysis\SteepSegmentDetector` |
-| `StatisticCalculator::calculateAveragePace()` (tekst) | `Statistics::$averagePaceSecondsPerKilometer` + `Analysis\PaceFormatter` |
-| `StatisticCalculator::calculateMovingPace()`, `StatisticType`, `$statisticsTypes` | usunięte; czas ruchu w statystykach **[etap 3]** |
+| `StatisticCalculator::detectRestPeriods()` (km/h, wymaga czasu wszystkich punktów) | `Analysis\RestPeriodDetector` (m/s, toleruje braki) → `RestPeriod` |
+| `StatisticCalculator::detectSteepSegments()` | `Analysis\SteepSegmentDetector` |
+| `StatisticCalculator::calculateAveragePace()` (tekst) | `Statistics::averagePaceSecondsPerKilometer()` + `Analysis\PaceFormatter` |
+| `StatisticCalculator::calculateMovingPace()` | `Statistics::movingPaceSecondsPerKilometer()` |
+| `StatisticType`, `$statisticsTypes` | usunięte |
