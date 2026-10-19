@@ -7,6 +7,7 @@ namespace GpxToolkit\Tests;
 use ArrayObject;
 use DateTimeImmutable;
 use GpxToolkit\Exception\GpxToolkitException;
+use GpxToolkit\Exception\LimitExceededException;
 use GpxToolkit\Exception\ReadException;
 use GpxToolkit\Exception\ValidationException;
 use GpxToolkit\Exception\XmlParseException;
@@ -330,5 +331,25 @@ final class ToolkitTest extends TestCase
 
         $configured->parseFile(Fixtures::path('track.gpx'));
         self::assertSame(['first:before', 'second:before', 'second:after', 'first:after'], $calls->getArrayCopy());
+    }
+
+    #[Test]
+    public function it_keeps_configuration_of_each_instance_separate(): void
+    {
+        $lenient = new Toolkit(new ToolkitOptions(allowMissingNamespace: true));
+        $limited = new Toolkit(new ToolkitOptions(maxPoints: 1));
+
+        self::assertCount(1, $lenient->parseFile(Fixtures::path('namespace-missing.gpx'))->tracks);
+
+        try {
+            $limited->parseFile(Fixtures::path('track.gpx'));
+            self::fail('Limited instance must reject the track.');
+        } catch (LimitExceededException) {
+        }
+
+        self::assertCount(1, $lenient->parseFile(Fixtures::path('track.gpx'))->tracks);
+
+        $this->expectException(ValidationException::class);
+        (new Toolkit())->parseFile(Fixtures::path('namespace-missing.gpx'));
     }
 }

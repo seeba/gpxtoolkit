@@ -115,6 +115,8 @@ argumenty należy przekazywać nazwane, jeśli pomija się parametry opcjonalne.
 - `Document` zawiera wyłącznie dane źródłowe. Wyniki pochodne (statystyki,
   bounds, WKT) nie są przechowywane w modelu — liczą je usługi `Analysis`
   i `Geometry`, więc nie mogą być nieaktualne po transformacji.
+  `Metadata::$bounds` to wartość z pliku (dane źródłowe), a nie wynik obliczeń;
+  transformacje jej nie przeliczają. Aktualne bounds daje `BoundsCalculator`.
 - Waypointy, punkty tras i punkty śladów to ta sama klasa `Point` (`wptType`).
 - Pola opcjonalne mają wartość `null`, gdy element nie występuje. Brak
   pomiaru nigdy nie jest zamieniany na `0`; zero w pliku jest poprawnym pomiarem.
@@ -147,6 +149,15 @@ po parsowaniu, w kolejności podanej w konstruktorze `Toolkit` lub
 `withMiddleware()`. Nie modyfikuje dokumentu wejściowego (model jest
 niemutowalny) — zwraca nowy albo przekazuje go dalej. Konfiguracja należy do
 instancji `Toolkit`; instancje nie współdzielą stanu.
+
+Transformacja zachowuje wszystko, czego nie zmienia: `with…()` kopiują
+pozostałe pola, w tym metadane i extensions na każdym poziomie.
+
+Dostarczone middleware:
+
+- `ReducePointsMiddleware(PointReducer $reducer = new PointReducer())` —
+  upraszcza każdy segment śladu (`PointReducer::reduce()`); trasy, waypointy,
+  metadane i extensions pozostają bez zmian.
 
 Biblioteka nie ma middleware działających przed parsowaniem: odczyt pliku,
 stringa i strumienia jest wspólny, a przetwarzanie surowej treści należy do
@@ -212,6 +223,26 @@ nie da się policzyć z danych, to `null` — nigdy `0` ani tekst.
   zakresu w kolejności dokumentu, ze skumulowanym dystansem (przerwy między
   liniami nie zwiększają dystansu), wysokością lub `null` oraz indeksami ścieżki,
   segmentu i punktu.
+- **Strome odcinki (`Analysis\SteepSegmentDetector`):** ciąg kolejnych par
+  w obrębie linii o nachyleniu co najmniej progu (domyślnie 10 %) w tym samym
+  kierunku i łącznym dystansie co najmniej minimum (domyślnie 50 m). Para bez
+  wysokości na którymś końcu albo o zerowym dystansie przerywa ciąg; zmiana
+  kierunku zaczyna nowy. Wynik: lista `SteepSegment` (typ `SteepSegmentType::Climb`
+  lub `Descent`, punkty i ich indeksy w linii, dystans, zmiana wysokości,
+  średnie nachylenie — ujemne dla zjazdów).
+- **Warunki wejścia narzędzi:** detektory (`RestPeriodDetector`,
+  `SteepSegmentDetector`) i `PointReducer` przyjmują punkty jednej ciągłej linii
+  (`Line::$points`, segment albo trasa), tolerują brakujące pomiary zgodnie
+  z opisem powyżej i zwracają indeksy w obrębie tej linii. Niepoprawna
+  konfiguracja konstruktora to `InvalidArgumentException` (błąd programisty).
+- **Redukcja (`Geometry\PointReducer`):** Ramer–Douglas–Peucker z tolerancją
+  w metrach (domyślnie 1 m). Odległość punktu od odcinka między zachowanymi
+  końcami liczona w lokalnej projekcji równoodległościowej linii (długość
+  geograficzna skalowana przez `cos` średniej szerokości, przejście przez
+  południk 180° obsługiwane). Odległość od odcinka, a nie od prostej, więc pętle
+  i trasy tam-i-z-powrotem zachowują kształt. Pierwszy i ostatni punkt są zawsze
+  zachowane, kolejność nie zmienia się, linie krótsze niż 3 punkty są zwracane
+  bez zmian; tolerancja 0 usuwa tylko punkty leżące dokładnie na odcinku.
 - **Bounds (`Geometry\BoundsCalculator`):** wszystkie punkty zakresu; `null`
   bez punktów.
 - **WKT (`Geometry\WktWriter`):** `longitude latitude`, bez SRID (WGS 84 jest
@@ -266,10 +297,10 @@ Pliki w `tests/Fixtures/gpx/`.
 | `Statistics::$elevationProfile` (sortowany, dystans od zera w każdym segmencie) | `Analysis\ElevationProfileBuilder` (skumulowany, w kolejności dokumentu) |
 | `CreateBoundsIfNotExistMiddleware` | `Geometry\BoundsCalculator::calculate()` |
 | `CreateWktMiddleware`, `GenerateWkt` | `Geometry\WktWriter` |
-| `ReducePointsMiddleware`, `ReduceGPXPoints` | `Middleware\ReducePointsMiddleware`, `Geometry\PointReducer` |
+| `ReducePointsMiddleware`, `ReduceGPXPoints` (tolerancja w stopniach) | `Middleware\ReducePointsMiddleware`, `Geometry\PointReducer` (`toleranceMeters`, domyślnie 1 m) |
 | `StatisticCalculator::calculateDistance()` | `Geometry\Distance::haversineMeters()` |
 | `StatisticCalculator::detectRestPeriods()` (km/h, wymaga czasu wszystkich punktów) | `Analysis\RestPeriodDetector` (m/s, toleruje braki) → `RestPeriod` |
-| `StatisticCalculator::detectSteepSegments()` | `Analysis\SteepSegmentDetector` |
+| `StatisticCalculator::detectSteepSegments()` (tablice, wymaga wysokości wszystkich punktów, minimum dystansu wyłącznie) | `Analysis\SteepSegmentDetector` → `SteepSegment` (toleruje braki, minimum włącznie) |
 | `StatisticCalculator::calculateAveragePace()` (tekst) | `Statistics::averagePaceSecondsPerKilometer()` + `Analysis\PaceFormatter` |
 | `StatisticCalculator::calculateMovingPace()` | `Statistics::movingPaceSecondsPerKilometer()` |
 | `StatisticType`, `$statisticsTypes` | usunięte |
