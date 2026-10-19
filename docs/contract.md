@@ -1,8 +1,6 @@
 # Kontrakt GPXToolkit 1.x
 
 Dokument opisuje wspierany zakres, publiczne API, semantykę wyników i błędy.
-Elementy oznaczone **[etap N]** są częścią kontraktu 1.0, ale ich implementacja
-jest jeszcze w toku zgodnie z planem wydania.
 
 ## Wspierany format
 
@@ -74,12 +72,27 @@ zamykany. Nazwa źródła (ścieżka lub `sourceName`) służy wyłącznie komun
 | Opcja | Domyślnie | Sprawdzana |
 |---|---|---|
 | `maxBytes` | 32 MiB | przed odczytem: rozmiar pliku, długość stringa; ze strumienia czytane jest najwyżej `maxBytes + 1` bajtów |
-| `maxPoints` | 1 000 000 | łączna liczba `wpt`, `rtept`, `trkpt` przed budową modelu |
+| `maxPoints` | 300 000 | łączna liczba `wpt`, `rtept`, `trkpt` przed budową modelu |
 
 `null` wyłącza limit. Przekroczenie daje `LimitExceededException`. Limit
 punktów jest sprawdzany po zbudowaniu drzewa XML, więc przed zużyciem pamięci
-przez parser chroni wyłącznie `maxBytes`. Wartości domyślne zostaną
-zweryfikowane pomiarami przed wydaniem 1.0.
+przez parser chroni wyłącznie `maxBytes`.
+
+Model jest budowany w całości w pamięci. Pomiar (`composer benchmark`, PHP 8.5
+bez xdebug, ślad z wysokością i czasem, ok. 100 B na punkt):
+
+| Punkty | Plik | Parsowanie | Statystyki | WKT | Redukcja | Szczyt pamięci |
+|---|---|---|---|---|---|---|
+| 10 000 | 0,9 MiB | 0,09 s | 0,01 s | < 0,01 s | 0,01 s | 16 MiB |
+| 100 000 | 9,4 MiB | 0,9 s | 0,12 s | 0,05 s | 0,8 s | 120 MiB |
+| 500 000 | 47 MiB | 4,4 s | 0,6 s | 0,26 s | 18 s | 585 MiB |
+| 1 000 000 | 94 MiB | 9,0 s | 1,2 s | 0,5 s | 74 s | 1,2 GiB |
+
+Pamięć rośnie liniowo (ok. 1,2 KiB na punkt). Domyślne limity odpowiadają
+ok. 83 godzinom zapisu co sekundę i ok. 350 MiB pamięci; większe pliki
+wymagają jawnego podniesienia limitów i `memory_limit`. Redukcja ma koszt
+pesymistycznie kwadratowy (Ramer–Douglas–Peucker) i dla długich, krętych
+linii jest najdroższą operacją.
 
 ## Rodzaje dokumentów
 
@@ -107,6 +120,27 @@ Gwarancja kompatybilności 1.x obejmuje:
 Klasy oznaczone `@internal` (`GpxToolkit\Internal\*`) nie są objęte gwarancją.
 Nowe opcjonalne parametry konstruktorów mogą być dodawane na końcu listy;
 argumenty należy przekazywać nazwane, jeśli pomija się parametry opcjonalne.
+
+### Polityka kompatybilności 1.x
+
+Wersjonowanie semantyczne. W ramach 1.x:
+
+- nie są usuwane ani zmieniane publiczne klasy, metody, właściwości, przypadki
+  enumów i ich wartości opisane w tym dokumencie, nie zmienia się też
+  semantyka wyników i jednostki;
+- mogą dochodzić nowe klasy, metody, opcjonalne parametry na końcu listy,
+  przypadki enumów i nowe pola wyników (klasy wyników są `final`, więc nowe
+  pola nie psują kodu wywołującego, ale pozycyjne wywołania ich konstruktorów
+  nie są wspierane);
+- poprawka błędu może zmienić wynik, jeśli dotychczasowy był niezgodny z tym
+  kontraktem — taka zmiana jest opisana w `CHANGELOG.md`;
+- domyślne limity (`ToolkitOptions`) mogą zostać zmienione w wersji minor,
+  z wpisem w `CHANGELOG.md`;
+- wymagana wersja PHP może wzrosnąć tylko w wersji minor i tylko po
+  zakończeniu wsparcia bezpieczeństwa dla dotychczasowej wersji.
+
+Implementacja interfejsu `Middleware` przez kod wywołujący jest wspierana;
+do interfejsów nie są dodawane nowe metody w ramach 1.x.
 
 ### Model
 

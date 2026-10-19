@@ -12,7 +12,7 @@ use InvalidArgumentException;
 final readonly class ToolkitOptions
 {
     public const int DEFAULT_MAX_BYTES = 32 * 1024 * 1024;
-    public const int DEFAULT_MAX_POINTS = 1_000_000;
+    public const int DEFAULT_MAX_POINTS = 300_000;
 
     /**
      * @param bool     $allowMissingNamespace compatibility mode: accept documents whose elements have no namespace
