@@ -3,7 +3,7 @@
 Format zgodny z [Keep a Changelog](https://keepachangelog.com/pl/1.1.0/),
 wersjonowanie semantyczne. Polityka kompatybilności 1.x: [docs/contract.md](docs/contract.md#polityka-kompatybilności-1x).
 
-## [Unreleased] — 1.0.0
+## [1.0.0] — 2026-10-19
 
 Pierwsze stabilne wydanie. Zmiana niekompatybilna z 0.x w całym publicznym API;
 odpowiedniki starych klas i metod: [docs/contract.md](docs/contract.md#migracja-z-0x).
